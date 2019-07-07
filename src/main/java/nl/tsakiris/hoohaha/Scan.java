@@ -46,6 +46,8 @@ public class Scan {
 
   @SneakyThrows
   private Fingerprint scanDirectory(Long parentId, Path path) {
+    System.out.print(path);
+    System.out.flush();
     Fingerprint fingerPrint = Fingerprint.builder()
         .type('d')
         .path(path.toString())
@@ -67,6 +69,7 @@ public class Scan {
     fingerPrint.setHash(hash);
     fingerPrint.setSize(totalSize);
     fingerPrintDao.update(fingerPrint);
+    System.out.println();
     return fingerPrint;
   }
 
