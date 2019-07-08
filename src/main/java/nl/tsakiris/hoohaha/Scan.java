@@ -56,17 +56,21 @@ public class Scan {
         .build();
     long id = fingerPrintDao.insert(fingerPrint);
     List<String> hashes = new ArrayList<>();
+    List<String> hashes2 = new ArrayList<>();
     long totalSize = 0L;
     List<Path> list = Files.list(path).collect(Collectors.toList());
     for (Path childPath : list) {
       Fingerprint childFingerPrint =
           Files.isRegularFile(childPath) ? scanFile(id, childPath) : scanDirectory(id, childPath);
       hashes.add(childFingerPrint.getHash());
+      hashes2.add(childFingerPrint.getHash2());
       totalSize += childFingerPrint.getSize();
     }
     String hash = DigestUtils.sha1Hex(hashes.stream().sorted().collect(Collectors.joining()));
+    String hash2 = DigestUtils.sha1Hex(hashes2.stream().sorted().collect(Collectors.joining()));
     fingerPrint.setId(id);
     fingerPrint.setHash(hash);
+    fingerPrint.setHash2(hash2);
     fingerPrint.setSize(totalSize);
     fingerPrintDao.update(fingerPrint);
     System.out.println();
@@ -78,12 +82,14 @@ public class Scan {
     System.out.print(path);
     System.out.flush();
     String hash = DigestUtils.sha1Hex(new FileInputStream(path.toFile()));
+    String hash2 = DigestUtils.sha1Hex(path.getFileName().toString());
     Fingerprint fingerPrint = Fingerprint.builder()
         .parentId(parentId)
         .path(path.toString())
         .type('f')
         .size(Files.size(path))
         .hash(hash)
+        .hash2(hash2)
         .build();
     fingerPrintDao.insert(fingerPrint);
     System.out.println();

@@ -87,9 +87,16 @@ public class Interactive {
 
       } else if (args[0].equals("top")) {
         if (args.length > 1) {
-          topDuplicates(Long.parseLong(args[1]));
+          topDuplicates(Long.parseLong(args[1]), false);
         } else {
-          topDuplicates(5);
+          topDuplicates(5, false);
+        }
+
+      } else if (args[0].equals("top2")) {
+        if (args.length > 1) {
+          topDuplicates(Long.parseLong(args[1]), true);
+        } else {
+          topDuplicates(5, true);
         }
 
       } else if (args[0].equals("setup_db")) {
@@ -178,22 +185,27 @@ public class Interactive {
     System.out.println("Updating " + parentFingerprint.getPath());
     long totalSize = 0;
     List<String> hashes = new ArrayList<>();
+    List<String> hashes2 = new ArrayList<>();
     List<Fingerprint> fingerprints = fingerPrintDao.getByParentId(id);
     for (Fingerprint fingerprint : fingerprints) {
       totalSize += fingerprint.getSize();
       hashes.add(fingerprint.getHash());
+      hashes2.add(fingerprint.getHash2());
     }
     String hash = DigestUtils.sha1Hex(hashes.stream().sorted().collect(Collectors.joining()));
+    String hash2 = DigestUtils.sha1Hex(hashes2.stream().sorted().collect(Collectors.joining()));
     parentFingerprint.setSize(totalSize);
     parentFingerprint.setHash(hash);
+    parentFingerprint.setHash2(hash2);
     fingerPrintDao.update(parentFingerprint);
     if (parentFingerprint.getParentId() != null) {
       updateParent(parentFingerprint.getParentId());
     }
   }
 
-  private void topDuplicates(long limit) {
-    List<String> hashes = fingerPrintDao.topDuplicates(limit);
+  private void topDuplicates(long limit, boolean filenamesOnly) {
+    List<String> hashes =
+        filenamesOnly ? fingerPrintDao.topDuplicates2(limit) : fingerPrintDao.topDuplicates(limit);
     for (String hash : hashes) {
       System.out.println(hash + ":");
       List<Fingerprint> fingerprints = fingerPrintDao.getByHash(hash);
