@@ -49,19 +49,7 @@ public class Interactive {
       String[] args = nextLine.trim().split("\\s+");
 
       if (args[0].equals("ls")) {
-        List<Fingerprint> fingerPrints = currentPathId != null ?
-            fingerPrintDao.getByParentId(currentPathId) :
-            fingerPrintDao.getTopLevel();
-        for (Fingerprint fingerprint : fingerPrints) {
-          System.out.format("%6d %c %s %7s %s\n",
-              fingerprint.getId(),
-              fingerprint.getType() == 'd' ? 'd' : '-',
-              fingerprint.getHash(),
-              humanReadableSize(fingerprint.getSize()),
-              currentPath != null ?
-                  fingerprint.getPath().substring(currentPath.length() + 1) :
-                  fingerprint.getPath());
-        }
+        list();
 
       } else if (args[0].equals("scan") && args.length > 1) {
         Scan scan = new Scan(fingerPrintDao);
@@ -71,11 +59,7 @@ public class Interactive {
         fingerPrintDao.truncate();
 
       } else if (args[0].equals("cd")) {
-        if (args.length > 1) {
-          changeDir(args[1]);
-        } else {
-          changeDir(null);
-        }
+        changeDir(args.length > 1 ? args[1] : null);
 
       } else if (args[0].matches("^[0-9]+$")) {
         changeDir(args[0]);
@@ -86,18 +70,10 @@ public class Interactive {
         }
 
       } else if (args[0].equals("top")) {
-        if (args.length > 1) {
-          topDuplicates(Long.parseLong(args[1]), false);
-        } else {
-          topDuplicates(5, false);
-        }
+        topDuplicates(args.length > 1 ? Long.parseLong(args[1]) : 5, false);
 
       } else if (args[0].equals("top2")) {
-        if (args.length > 1) {
-          topDuplicates(Long.parseLong(args[1]), true);
-        } else {
-          topDuplicates(5, true);
-        }
+        topDuplicates(args.length > 1 ? Long.parseLong(args[1]) : 5, true);
 
       } else if (args[0].equals("setup_db")) {
         fingerPrintDao.dropTable();
@@ -109,6 +85,22 @@ public class Interactive {
       } else if (args[0].length() > 0) {
         System.err.println("Unknown command");
       }
+    }
+  }
+
+  private void list() {
+    List<Fingerprint> fingerPrints = currentPathId != null ?
+        fingerPrintDao.getByParentId(currentPathId) :
+        fingerPrintDao.getTopLevel();
+    for (Fingerprint fingerprint : fingerPrints) {
+      System.out.format("%6d %c %s %7s %s\n",
+          fingerprint.getId(),
+          fingerprint.getType() == 'd' ? 'd' : '-',
+          fingerprint.getHash(),
+          humanReadableSize(fingerprint.getSize()),
+          currentPath != null ?
+              fingerprint.getPath().substring(currentPath.length() + 1) :
+              fingerprint.getPath());
     }
   }
 
