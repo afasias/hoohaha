@@ -14,11 +14,18 @@ import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
 public class Scan {
 
+  public static enum Strategy {
+    CONTENT,
+    FILENAME,
+  }
+
   private final FingerPrintDao fingerPrintDao;
+  private final Strategy strategy;
 
   @SneakyThrows
-  public Scan(FingerPrintDao fingerPrintDao) {
+  public Scan(FingerPrintDao fingerPrintDao, Strategy strategy) {
     this.fingerPrintDao = fingerPrintDao;
+    this.strategy = strategy;
   }
 
   @SneakyThrows
@@ -29,7 +36,7 @@ public class Scan {
     jdbi.installPlugin(new SqlObjectPlugin());
     FingerPrintDao fingerPrintDao = jdbi.onDemand(FingerPrintDao.class);
     fingerPrintDao.truncate();
-    Scan scan = new Scan(fingerPrintDao);
+    Scan scan = new Scan(fingerPrintDao, Strategy.CONTENT);
     scan.run(Paths.get(args[3]));
   }
 
@@ -53,7 +60,6 @@ public class Scan {
         .path(path.toString())
         .parentId(parentId)
         .hash("")
-        .hash2("")
         .build();
     long id = fingerPrintDao.insert(fingerPrint);
     List<String> hashes = new ArrayList<>();
@@ -64,14 +70,11 @@ public class Scan {
       Fingerprint childFingerPrint =
           Files.isRegularFile(childPath) ? scanFile(id, childPath) : scanDirectory(id, childPath);
       hashes.add(childFingerPrint.getHash());
-      hashes2.add(childFingerPrint.getHash2());
       totalSize += childFingerPrint.getSize();
     }
     String hash = DigestUtils.sha1Hex(hashes.stream().sorted().collect(Collectors.joining()));
-    String hash2 = DigestUtils.sha1Hex(hashes2.stream().sorted().collect(Collectors.joining()));
     fingerPrint.setId(id);
     fingerPrint.setHash(hash);
-    fingerPrint.setHash2(hash2);
     fingerPrint.setSize(totalSize);
     fingerPrintDao.update(fingerPrint);
     System.out.println();
@@ -82,15 +85,15 @@ public class Scan {
   private Fingerprint scanFile(Long parentId, Path path) {
     System.out.print(path);
     System.out.flush();
-    String hash = DigestUtils.sha1Hex(new FileInputStream(path.toFile()));
-    String hash2 = DigestUtils.sha1Hex(path.getFileName().toString());
+    String hash = strategy == Strategy.CONTENT
+            ? DigestUtils.sha1Hex(new FileInputStream(path.toFile()))
+            : DigestUtils.sha1Hex(path.getFileName().toString());
     Fingerprint fingerPrint = Fingerprint.builder()
         .parentId(parentId)
         .path(path.toString())
         .type('f')
         .size(Files.size(path))
         .hash(hash)
-        .hash2(hash2)
         .build();
     fingerPrintDao.insert(fingerPrint);
     System.out.println();

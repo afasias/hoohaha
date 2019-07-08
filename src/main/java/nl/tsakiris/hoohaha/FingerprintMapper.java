@@ -16,7 +16,6 @@ public class FingerprintMapper implements RowMapper<Fingerprint> {
     return Fingerprint.builder()
         .id(rs.getLong("id"))
         .hash(rs.getString("hash"))
-        .hash2(rs.getString("hash2"))
         .parentId(parentId)
         .path(rs.getString("path"))
         .size(rs.getLong("size"))

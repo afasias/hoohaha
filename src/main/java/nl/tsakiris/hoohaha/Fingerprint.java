@@ -17,6 +17,5 @@ public class Fingerprint {
   private Long parentId;
   private long size;
   private String hash;
-  private String hash2;
 
 }

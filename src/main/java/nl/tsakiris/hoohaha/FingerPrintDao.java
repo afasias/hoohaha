@@ -19,10 +19,8 @@ public interface FingerPrintDao {
       + "  parentId INT UNSIGNED DEFAULT NULL,"
       + "  size BIGINT unsigned NOT NULL,"
       + "  hash VARCHAR(64) NOT NULL,"
-      + "  hash2 VARCHAR(64) NOT NULL,"
       + "  PRIMARY KEY (id),"
       + "  KEY hash (hash),"
-      + "  KEY hash2 (hash2),"
       + "  KEY parentId (parentId),"
       + "  FOREIGN KEY (parentId) REFERENCES FingerPrint (id) ON DELETE CASCADE"
       + ") ENGINE=InnoDB CHARACTER SET=utf8")
@@ -33,11 +31,11 @@ public interface FingerPrintDao {
 
   @GetGeneratedKeys
   @SqlUpdate("INSERT INTO FingerPrint"
-      + " (id, type, path, parentId, size, hash, hash2)"
-      + " VALUES (:id, :type, :path, :parentId, :size, :hash, :hash2)")
+      + " (id, type, path, parentId, size, hash)"
+      + " VALUES (:id, :type, :path, :parentId, :size, :hash)")
   long insert(@BindBean Fingerprint fingerPrint);
 
-  @SqlUpdate("UPDATE FingerPrint SET hash = :hash, hash2 = :hash2, size = :size WHERE id = :id")
+  @SqlUpdate("UPDATE FingerPrint SET hash = :hash, size = :size WHERE id = :id")
   void update(@BindBean Fingerprint fingerPrint);
 
   @SqlQuery("SELECT * FROM FingerPrint WHERE parentId IS NULL")
@@ -56,14 +54,7 @@ public interface FingerPrintDao {
       + "GROUP BY hash HAVING count(*) > 1 ORDER BY size DESC LIMIT :limit")
   List<String> topDuplicates(@Bind("limit") long limit);
 
-  @SqlQuery("SELECT hash2 FROM FingerPrint "
-      + "GROUP BY hash2 HAVING count(*) > 1 ORDER BY size DESC LIMIT :limit")
-  List<String> topDuplicates2(@Bind("limit") long limit);
-
   @SqlQuery("SELECT * FROM FingerPrint WHERE hash = :hash")
   List<Fingerprint> getByHash(@Bind("hash") String hash);
-
-  @SqlQuery("SELECT * FROM FingerPrint WHERE hash2 = :hash2")
-  List<Fingerprint> getByHash2(@Bind("hash2") String hash2);
 
 }

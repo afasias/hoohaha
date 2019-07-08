@@ -19,6 +19,7 @@ public class Interactive {
 
   private Long currentPathId = null;
   private String currentPath = null;
+  private Scan.Strategy currentStrategy = Scan.Strategy.CONTENT;
 
   private final Scanner scanner = new Scanner(System.in);
   private final FingerPrintDao fingerPrintDao;
@@ -85,7 +86,7 @@ public class Interactive {
         listAliases();
 
       } else if (args[0].equals("scan") && args.length > 1) {
-        Scan scan = new Scan(fingerPrintDao);
+        Scan scan = new Scan(fingerPrintDao, currentStrategy);
         scan.run(Paths.get(args[1]));
 
       } else if (args[0].equals("truncate")) {
@@ -103,14 +104,14 @@ public class Interactive {
         }
 
       } else if (args[0].equals("top")) {
-        topDuplicates(args.length > 1 ? Long.parseLong(args[1]) : 5, false);
-
-      } else if (args[0].equals("top2")) {
-        topDuplicates(args.length > 1 ? Long.parseLong(args[1]) : 5, true);
+        topDuplicates(args.length > 1 ? Long.parseLong(args[1]) : 5);
 
       } else if (args[0].equals("setup_db")) {
         fingerPrintDao.dropTable();
         fingerPrintDao.createTable();
+
+      } else if (args[0].equals("strategy")) {
+        doStrategy(args);
 
       } else if (args[0].equals("exit") || args[0].equals("q")) {
         break;
@@ -119,6 +120,13 @@ public class Interactive {
         System.err.println("Unknown command");
       }
     }
+  }
+
+  private void doStrategy(String[] args) {
+    if (args.length > 1) {
+      currentStrategy = Scan.Strategy.valueOf(args[1].toUpperCase());
+    }
+    System.out.println("Current strategy: " + currentStrategy);
   }
 
   private void listAliases() {
@@ -238,22 +246,19 @@ public class Interactive {
     for (Fingerprint fingerprint : fingerprints) {
       totalSize += fingerprint.getSize();
       hashes.add(fingerprint.getHash());
-      hashes2.add(fingerprint.getHash2());
     }
     String hash = DigestUtils.sha1Hex(hashes.stream().sorted().collect(Collectors.joining()));
     String hash2 = DigestUtils.sha1Hex(hashes2.stream().sorted().collect(Collectors.joining()));
     parentFingerprint.setSize(totalSize);
     parentFingerprint.setHash(hash);
-    parentFingerprint.setHash2(hash2);
     fingerPrintDao.update(parentFingerprint);
     if (parentFingerprint.getParentId() != null) {
       updateParent(parentFingerprint.getParentId());
     }
   }
 
-  private void topDuplicates(long limit, boolean filenamesOnly) {
-    List<String> hashes =
-        filenamesOnly ? fingerPrintDao.topDuplicates2(limit) : fingerPrintDao.topDuplicates(limit);
+  private void topDuplicates(long limit) {
+    List<String> hashes = fingerPrintDao.topDuplicates(limit);
     aliases.clear();
     for (String hash : hashes) {
       System.out.println(hash + ":");
