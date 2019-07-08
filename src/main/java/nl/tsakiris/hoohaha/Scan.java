@@ -53,6 +53,7 @@ public class Scan {
         .path(path.toString())
         .parentId(parentId)
         .hash("")
+        .hash2("")
         .build();
     long id = fingerPrintDao.insert(fingerPrint);
     List<String> hashes = new ArrayList<>();

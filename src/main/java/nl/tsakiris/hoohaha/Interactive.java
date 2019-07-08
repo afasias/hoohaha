@@ -3,7 +3,9 @@ package nl.tsakiris.hoohaha;
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Scanner;
 import java.util.stream.Collectors;
@@ -20,6 +22,8 @@ public class Interactive {
 
   private final Scanner scanner = new Scanner(System.in);
   private final FingerPrintDao fingerPrintDao;
+
+  private final Map<Long, Fingerprint> aliases = new HashMap<>();
 
   public Interactive(FingerPrintDao fingerPrintDao) {
     this.fingerPrintDao = fingerPrintDao;
@@ -39,6 +43,7 @@ public class Interactive {
 
   public void run() {
 
+    main_loop:
     while (true) {
       System.out.print(Optional.ofNullable(currentPath).orElse("#") + "> ");
       System.out.flush();
@@ -48,8 +53,36 @@ public class Interactive {
       String nextLine = scanner.nextLine();
       String[] args = nextLine.trim().split("\\s+");
 
+      if (args[0].length() < 1) {
+        continue;
+      }
+
+      boolean aliasesUsed = false;
+      for (int i = 0; i < args.length; i++) {
+        if (args[i].charAt(0) == '@') {
+          long alias = Long.parseLong(args[i].substring(1));
+          Fingerprint fingerprint = aliases.get(alias);
+          if (fingerprint == null) {
+            System.err.println("No such alias: @" + alias);
+            continue main_loop;
+          }
+          args[i] = String.valueOf(fingerprint.getId());
+          aliasesUsed = true;
+        }
+      }
+      if (aliasesUsed) {
+        System.out.print("Rewritten as:");
+        for (String arg : args) {
+          System.out.print(" " + arg);
+        }
+        System.out.println();
+      }
+
       if (args[0].equals("ls")) {
         list();
+
+      } else if (args[0].equals("alias")) {
+        listAliases();
 
       } else if (args[0].equals("scan") && args.length > 1) {
         Scan scan = new Scan(fingerPrintDao);
@@ -82,9 +115,25 @@ public class Interactive {
       } else if (args[0].equals("exit") || args[0].equals("q")) {
         break;
 
-      } else if (args[0].length() > 0) {
+      } else {
         System.err.println("Unknown command");
       }
+    }
+  }
+
+  private void listAliases() {
+    List<Fingerprint> fingerPrints = currentPathId != null ?
+        fingerPrintDao.getByParentId(currentPathId) :
+        fingerPrintDao.getTopLevel();
+    for (long alias : aliases.keySet()) {
+      Fingerprint fingerprint = aliases.get(alias);
+      System.out.format("%6d %4s %c %s %7s %s\n",
+          fingerprint.getId(),
+          "@" + alias,
+          fingerprint.getType() == 'd' ? 'd' : '-',
+          fingerprint.getHash(),
+          humanReadableSize(fingerprint.getSize()),
+          fingerprint.getPath());
     }
   }
 
@@ -92,14 +141,18 @@ public class Interactive {
     List<Fingerprint> fingerPrints = currentPathId != null ?
         fingerPrintDao.getByParentId(currentPathId) :
         fingerPrintDao.getTopLevel();
+    aliases.clear();
     for (Fingerprint fingerprint : fingerPrints) {
-      System.out.format("%6d %c %s %7s %s\n",
+      long nextAlias = aliases.size() + 1;
+      aliases.put(nextAlias, fingerprint);
+      System.out.format("%6d %4s %c %s %7s %s\n",
           fingerprint.getId(),
+          "@" + nextAlias,
           fingerprint.getType() == 'd' ? 'd' : '-',
           fingerprint.getHash(),
           humanReadableSize(fingerprint.getSize()),
           currentPath != null ?
-              fingerprint.getPath().substring(currentPath.length() + 1) :
+              Paths.get(fingerprint.getPath()).getFileName() :
               fingerprint.getPath());
     }
   }
@@ -159,6 +212,8 @@ public class Interactive {
       return;
     }
 
+    System.out.print("Deleting: " + fingerprint.getPath() + " ...");
+    System.out.flush();
     File file = new File(fingerprint.getPath());
     if (file.isDirectory()) {
       FileUtils.deleteDirectory(file);
@@ -166,6 +221,7 @@ public class Interactive {
       file.delete();
     }
     fingerPrintDao.delete(fingerprint);
+    System.out.println();
     Long parentId = fingerprint.getParentId();
     if (parentId != null) {
       updateParent(parentId);
@@ -198,12 +254,16 @@ public class Interactive {
   private void topDuplicates(long limit, boolean filenamesOnly) {
     List<String> hashes =
         filenamesOnly ? fingerPrintDao.topDuplicates2(limit) : fingerPrintDao.topDuplicates(limit);
+    aliases.clear();
     for (String hash : hashes) {
       System.out.println(hash + ":");
       List<Fingerprint> fingerprints = fingerPrintDao.getByHash(hash);
       for (Fingerprint fingerprint : fingerprints) {
-        System.out.format("  %6d %c %7s %s\n",
+        long nextAlias = aliases.size() + 1;
+        aliases.put(nextAlias, fingerprint);
+        System.out.format("  %6d %4s %c %7s %s\n",
             fingerprint.getId(),
+            "@" + nextAlias,
             fingerprint.getType() == 'd' ? 'd' : '-',
             humanReadableSize(fingerprint.getSize()),
             fingerprint.getPath());
