@@ -19,7 +19,7 @@ public class Interactive {
 
   private Long currentPathId = null;
   private String currentPath = null;
-  private Scan.Strategy currentStrategy = Scan.Strategy.CONTENT;
+  private Scan.Strategy currentStrategy = Scan.Strategy.FAST;
 
   private final Scanner scanner = new Scanner(System.in);
   private final FingerPrintDao fingerPrintDao;

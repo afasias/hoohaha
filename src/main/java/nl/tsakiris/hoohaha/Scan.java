@@ -4,10 +4,12 @@ import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
@@ -15,9 +17,11 @@ import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 public class Scan {
 
   public static enum Strategy {
+    FAST,
     CONTENT,
     FILENAME,
   }
+
 
   private final FingerPrintDao fingerPrintDao;
   private final Strategy strategy;
@@ -36,7 +40,7 @@ public class Scan {
     jdbi.installPlugin(new SqlObjectPlugin());
     FingerPrintDao fingerPrintDao = jdbi.onDemand(FingerPrintDao.class);
     fingerPrintDao.truncate();
-    Scan scan = new Scan(fingerPrintDao, Strategy.CONTENT);
+    Scan scan = new Scan(fingerPrintDao, Strategy.FAST);
     scan.run(Paths.get(args[3]));
   }
 
@@ -86,18 +90,48 @@ public class Scan {
     System.out.print(path);
     System.out.flush();
     String hash = strategy == Strategy.CONTENT
-            ? DigestUtils.sha1Hex(new FileInputStream(path.toFile()))
-            : DigestUtils.sha1Hex(path.getFileName().toString());
+        ? DigestUtils.sha1Hex(new FileInputStream(path.toFile()))
+        : DigestUtils.sha1Hex(path.getFileName().toString());
     Fingerprint fingerPrint = Fingerprint.builder()
         .parentId(parentId)
         .path(path.toString())
         .type('f')
         .size(Files.size(path))
-        .hash(hash)
+        .hash(calculateHash(path))
         .build();
     fingerPrintDao.insert(fingerPrint);
     System.out.println();
     return fingerPrint;
+  }
+
+  @SneakyThrows
+  private String calculateHash(Path path) {
+    switch (strategy) {
+      case CONTENT:
+        return DigestUtils.sha1Hex(new FileInputStream(path.toFile()));
+      case FILENAME:
+        return DigestUtils.sha1Hex(path.getFileName().toString());
+      default:
+        return fastHash(path);
+    }
+  }
+
+  @SneakyThrows
+  private String fastHash(Path path) {
+    long size = Files.size(path);
+    if (size < 8_388_608) {
+      return DigestUtils.sha1Hex(new FileInputStream(path.toFile()));
+    }
+    long skipBytes = (size - 8_388_608) / 127;
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+    FileInputStream is = new FileInputStream((path.toFile()));
+    byte[] chunk = new byte[65_536];
+    for (int i = 0; i < 128; i++) {
+      is.read(chunk);
+      md.update(chunk);
+      is.skip(skipBytes);
+    }
+    return Hex.encodeHexString(md.digest());
   }
 
 }
